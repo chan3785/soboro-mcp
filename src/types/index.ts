@@ -126,7 +126,7 @@ export interface TokenPrice {
   priceChange24h: number;
   priceChangePercentage24h: number;
   volume24h: number;
-  marketCap?: number;
+  marketCap?: number | undefined;
   lastUpdated: string;
 }
 

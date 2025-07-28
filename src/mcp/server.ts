@@ -356,92 +356,351 @@ export class SoroswapMCPServer {
   }
 
   // ============================================================================
-  // 도구 핸들러 메서드들 (임시 구현)
+  // 도구 핸들러 메서드들 (실제 서비스 연동)
   // ============================================================================
 
   private async handleSwapTokens(args: any): Promise<any> {
-    // TODO: 실제 스왑 로직 구현 예정
-    return {
-      success: false,
-      message: 'Swap functionality not yet implemented',
-      args,
-    };
+    try {
+      const { swapService } = await import('@/core/swap-service');
+      
+      const swapRequest = {
+        fromToken: args.fromToken,
+        toToken: args.toToken,
+        amount: args.amount,
+        slippage: args.slippage || 1.0,
+        accountSecret: args.accountSecret,
+      };
+
+      const result = await swapService.executeSwap(swapRequest);
+      
+      return {
+        success: result.success,
+        transactionHash: result.transactionHash,
+        fromToken: result.fromToken,
+        toToken: result.toToken,
+        fromAmount: result.fromAmount,
+        toAmount: result.toAmount,
+        actualReceived: result.actualReceived,
+        fee: result.fee,
+        timestamp: result.timestamp,
+        error: result.error,
+        explorerUrl: result.transactionHash ? 
+          `https://stellar.expert/explorer/testnet/tx/${result.transactionHash}` : undefined,
+      };
+    } catch (error) {
+      log.error('Swap tokens handler failed', error as Error);
+      return {
+        success: false,
+        error: (error as Error).message,
+        timestamp: new Date().toISOString(),
+      };
+    }
   }
 
   private async handleGetPrice(args: any): Promise<any> {
-    // TODO: 실제 가격 조회 로직 구현 예정
-    return {
-      tokenPair: args.tokenPair,
-      price: 0,
-      message: 'Price functionality not yet implemented',
-    };
+    try {
+      const { priceService } = await import('@/core/price-service');
+      
+      const priceRequest = {
+        tokenPair: args.tokenPair,
+        includeChange: args.includeChange !== false,
+      };
+
+      const price = await priceService.getTokenPairPrice(priceRequest);
+      
+      return {
+        symbol: price.symbol,
+        price: price.price,
+        priceUsd: price.priceUsd,
+        priceChange24h: price.priceChange24h,
+        priceChangePercentage24h: price.priceChangePercentage24h,
+        volume24h: price.volume24h,
+        marketCap: price.marketCap,
+        lastUpdated: price.lastUpdated,
+      };
+    } catch (error) {
+      log.error('Get price handler failed', error as Error);
+      return {
+        error: (error as Error).message,
+        tokenPair: args.tokenPair,
+        timestamp: new Date().toISOString(),
+      };
+    }
   }
 
   private async handleGetBalance(args: any): Promise<any> {
-    // TODO: 실제 잔액 조회 로직 구현 예정
-    return {
-      account: args.account,
-      balances: [],
-      message: 'Balance functionality not yet implemented',
-    };
+    try {
+      const { walletService } = await import('@/core/wallet-service');
+      
+      if (args.token) {
+        // 특정 토큰 잔액 조회
+        const balance = await walletService.getTokenBalance(args.account, args.token);
+        return {
+          account: args.account,
+          token: args.token,
+          balance,
+          timestamp: new Date().toISOString(),
+        };
+      } else {
+        // 모든 잔액 조회
+        const balances = await walletService.getBalances(args.account);
+        return {
+          account: args.account,
+          balances: balances.map(b => ({
+            asset: b.asset,
+            assetType: b.assetType,
+            assetCode: b.assetCode,
+            assetIssuer: b.assetIssuer,
+            balance: b.balance,
+            limit: b.limit,
+          })),
+          timestamp: new Date().toISOString(),
+        };
+      }
+    } catch (error) {
+      log.error('Get balance handler failed', error as Error);
+      return {
+        error: (error as Error).message,
+        account: args.account,
+        timestamp: new Date().toISOString(),
+      };
+    }
   }
 
   private async handleGetHistory(args: any): Promise<any> {
-    // TODO: 실제 히스토리 조회 로직 구현 예정
-    return {
-      account: args.account,
-      transactions: [],
-      message: 'History functionality not yet implemented',
-    };
+    try {
+      const { walletService } = await import('@/core/wallet-service');
+      
+      const limit = args.limit || 10;
+      const transactions = await walletService.getTransactionHistory(args.account, limit);
+      
+      return {
+        account: args.account,
+        transactions: transactions.map(tx => ({
+          hash: tx.hash,
+          ledger: tx.ledger,
+          createdAt: tx.createdAt,
+          sourceAccount: tx.sourceAccount,
+          feePaid: tx.feePaid,
+          operationCount: tx.operationCount,
+          successful: tx.successful,
+          explorerUrl: `https://stellar.expert/explorer/testnet/tx/${tx.hash}`,
+        })),
+        count: transactions.length,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      log.error('Get history handler failed', error as Error);
+      return {
+        error: (error as Error).message,
+        account: args.account,
+        timestamp: new Date().toISOString(),
+      };
+    }
   }
 
   private async handleEstimateSwap(args: any): Promise<any> {
-    // TODO: 실제 스왑 추정 로직 구현 예정
-    return {
-      fromToken: args.fromToken,
-      toToken: args.toToken,
-      amount: args.amount,
-      estimatedOutput: 0,
-      message: 'Estimate functionality not yet implemented',
-    };
+    try {
+      const { swapService } = await import('@/core/swap-service');
+      
+      const swapRequest = {
+        fromToken: args.fromToken,
+        toToken: args.toToken,
+        amount: args.amount,
+        slippage: args.slippage || 1.0,
+      };
+
+      const estimate = await swapService.estimateSwap(swapRequest);
+      
+      return {
+        fromToken: estimate.fromToken,
+        toToken: estimate.toToken,
+        fromAmount: estimate.fromAmount,
+        toAmount: estimate.toAmount,
+        minimumReceived: estimate.minimumReceived,
+        priceImpact: estimate.priceImpact,
+        fee: estimate.fee,
+        path: estimate.path,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      log.error('Estimate swap handler failed', error as Error);
+      return {
+        error: (error as Error).message,
+        fromToken: args.fromToken,
+        toToken: args.toToken,
+        amount: args.amount,
+        timestamp: new Date().toISOString(),
+      };
+    }
   }
 
   // ============================================================================
-  // 리소스 핸들러 메서드들 (임시 구현)
+  // 리소스 핸들러 메서드들 (실제 서비스 연동)
   // ============================================================================
 
   private async getAccountInfo(): Promise<any> {
-    return {
-      message: 'Account info not yet implemented',
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const { walletService } = await import('@/core/wallet-service');
+      
+      const defaultAccount = await walletService.getDefaultAccountInfo();
+      
+      if (defaultAccount) {
+        return {
+          account: {
+            publicKey: defaultAccount.publicKey,
+            accountId: defaultAccount.accountId,
+            isConnected: defaultAccount.isConnected,
+            balanceCount: defaultAccount.balances.length,
+            trustlineCount: defaultAccount.trustlineCount,
+            availableXLM: defaultAccount.availableXLM,
+          },
+          timestamp: new Date().toISOString(),
+        };
+      } else {
+        return {
+          message: 'No default account configured',
+          timestamp: new Date().toISOString(),
+        };
+      }
+    } catch (error) {
+      log.error('Get account info failed', error as Error);
+      return {
+        error: (error as Error).message,
+        timestamp: new Date().toISOString(),
+      };
+    }
   }
 
   private async getMarketPrices(): Promise<any> {
-    return {
-      message: 'Market prices not yet implemented',
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const { priceService } = await import('@/core/price-service');
+      
+      const marketSummary = await priceService.getMarketSummary();
+      const allPrices = await priceService.getAllPrices();
+      
+      return {
+        summary: {
+          totalMarketCap: marketSummary.totalMarketCap,
+          totalVolume24h: marketSummary.totalVolume24h,
+          totalTokens: marketSummary.totalTokens,
+        },
+        topGainers: marketSummary.topGainers,
+        topLosers: marketSummary.topLosers,
+        prices: allPrices.map(price => ({
+          symbol: price.symbol,
+          price: price.price,
+          priceUsd: price.priceUsd,
+          change24h: price.priceChangePercentage24h,
+          volume24h: price.volume24h,
+        })),
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      log.error('Get market prices failed', error as Error);
+      return {
+        error: (error as Error).message,
+        timestamp: new Date().toISOString(),
+      };
+    }
   }
 
   private async getLiquidityPools(): Promise<any> {
-    return {
-      message: 'Liquidity pools not yet implemented',
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const { soroswapClient } = await import('@/soroswap/client');
+      
+      const pools = await soroswapClient.getPools();
+      
+      return {
+        pools: pools.map(pool => ({
+          id: pool.id,
+          token0: {
+            symbol: pool.token0.symbol,
+            name: pool.token0.name,
+            contract: pool.token0.contract,
+          },
+          token1: {
+            symbol: pool.token1.symbol,
+            name: pool.token1.name,
+            contract: pool.token1.contract,
+          },
+          reserve0: pool.reserve0,
+          reserve1: pool.reserve1,
+          totalSupply: pool.totalSupply,
+          fee: pool.fee,
+        })),
+        count: pools.length,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      log.error('Get liquidity pools failed', error as Error);
+      return {
+        error: (error as Error).message,
+        timestamp: new Date().toISOString(),
+      };
+    }
   }
 
   private async getNetworkStatus(): Promise<any> {
-    return {
-      stellar: {
-        network: 'testnet',
-        status: 'connected',
-      },
-      soroswap: {
-        status: 'not implemented',
-      },
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const { stellarClient } = await import('@/stellar/client');
+      const { soroswapClient } = await import('@/soroswap/client');
+      const { walletService } = await import('@/core/wallet-service');
+      const { priceService } = await import('@/core/price-service');
+      const { swapService } = await import('@/core/swap-service');
+      
+      const [
+        stellarStatus,
+        soroswapStatus,
+        walletStatus,
+        priceStatus,
+        swapStatus
+      ] = await Promise.all([
+        stellarClient.testConnection(),
+        soroswapClient.testConnection(),
+        walletService.healthCheck(),
+        priceService.healthCheck(),
+        swapService.healthCheck(),
+      ]);
+
+      return {
+        stellar: {
+          network: stellarClient.getNetworkInfo().network,
+          horizonUrl: stellarClient.getNetworkInfo().horizonUrl,
+          connected: stellarStatus,
+        },
+        soroswap: {
+          apiUrl: soroswapClient.getConfig().baseURL,
+          hasApiKey: soroswapClient.getConfig().hasApiKey,
+          connected: soroswapStatus,
+        },
+        services: {
+          wallet: {
+            connectedWallets: walletStatus.connectedWallets,
+            defaultAccountStatus: walletStatus.defaultAccountStatus,
+            stellarNetworkStatus: walletStatus.stellarNetworkStatus,
+          },
+          price: {
+            soroswapApiStatus: priceStatus.soroswapApiStatus,
+            cacheSize: priceStatus.cacheSize,
+            lastPriceUpdate: priceStatus.lastPriceUpdate,
+          },
+          swap: {
+            stellarConnection: swapStatus.stellarConnection,
+            soroswapConnection: swapStatus.soroswapConnection,
+            defaultAccountStatus: swapStatus.defaultAccountStatus,
+            supportedTokens: swapStatus.supportedTokens,
+          },
+        },
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      log.error('Get network status failed', error as Error);
+      return {
+        error: (error as Error).message,
+        timestamp: new Date().toISOString(),
+      };
+    }
   }
 
   // ============================================================================

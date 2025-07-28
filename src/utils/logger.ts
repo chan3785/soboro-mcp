@@ -243,14 +243,14 @@ export function generateRequestId(): string {
 /**
  * 실행 시간 측정 데코레이터
  */
-export function measureTime<T extends (...args: any[]) => Promise<any>>(
+export function measureTime(
   operation: string,
   logger: ContextLogger = log
 ) {
-  return function (_target: any, _propertyName: string, descriptor: TypedPropertyDescriptor<T>) {
-    const method = descriptor.value!;
+  return function (_target: any, _propertyName: string, descriptor: PropertyDescriptor) {
+    const method = descriptor.value;
 
-    descriptor.value = (async function (this: any, ...args: any[]) {
+    descriptor.value = async function (this: any, ...args: any[]) {
       const startTime = Date.now();
       try {
         const result = await method.apply(this, args);
@@ -262,7 +262,7 @@ export function measureTime<T extends (...args: any[]) => Promise<any>>(
         logger.performance(`${operation} (failed)`, duration);
         throw error;
       }
-    }) as T;
+    };
 
     return descriptor;
   };
